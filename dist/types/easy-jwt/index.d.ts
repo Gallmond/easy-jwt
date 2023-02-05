@@ -34,6 +34,7 @@ declare class EasyJWT {
     accessTokenValidation: (func: ValidationCheckFunction) => void;
     refreshTokenValidation: (func: ValidationCheckFunction) => void;
     private getJid;
+    private getSigningOptions;
     private createAccessToken;
     private createRefreshToken;
     decode: (jwt: JWTString) => Jwt | null;
@@ -42,8 +43,10 @@ declare class EasyJWT {
         refreshToken: string;
         expiresIn: SECONDS;
     };
+    private customValidation;
     verifyJwt: (jwt: string) => JwtPayload;
     refreshJwt: (refreshToken: string) => string;
+    private clearPayloadForDuplication;
     getsModel<T>(func: UserGetter<T>): void;
     getModel<T>(jwt: JWTString): T;
 }

@@ -74,34 +74,30 @@ class EasyJWT{
         return randomBytes(16).toString('hex')
     }
 
-    private createAccessToken = (subject: string, customPayload: JwtPayload = {}): string => {
-        const payload = {
-            ...customPayload,
-            type: TOKEN_TYPES.access,
+    private getSigningOptions = (subject: string, expiresIn: number) => {
+        return {
+            subject,
+            expiresIn,
+            audience: this.audience,
+            issuer: this.issuer,
+            jwtid: this.getJid()
         }
+    }
 
-        const expiresIn = this.accessTokenOptions.expiresIn
-        const {audience, issuer} = this
-        const jwtid = this.getJid()
-
-        return sign(payload, this.secret, {
-            expiresIn, audience, issuer, jwtid, subject
-        })
+    private createAccessToken = (subject: string, customPayload: JwtPayload = {}): string => {
+        return sign(
+            { ...customPayload, type: TOKEN_TYPES.access },
+            this.secret,
+            this.getSigningOptions(subject, this.accessTokenOptions.expiresIn) 
+        )
     }
 
     private createRefreshToken = (subject: string, customPayload: JwtPayload = {}) => {
-        const payload = {
-            ...customPayload,
-            type: TOKEN_TYPES.refresh,
-        }
-
-        const expiresIn = this.refreshTokenOptions.expiresIn
-        const {audience, issuer} = this
-        const jwtid = this.getJid()
-
-        return sign(payload, this.secret, {
-            expiresIn, audience, issuer, jwtid, subject
-        })
+        return sign(
+            { ...customPayload, type: TOKEN_TYPES.refresh },
+            this.secret,
+            this.getSigningOptions(subject, this.refreshTokenOptions.expiresIn)
+        )
     }
 
     decode = (jwt: JWTString): Jwt | null => {
@@ -116,17 +112,24 @@ class EasyJWT{
         }
     }
 
+    private customValidation = (jwt: JWTString, payload: JwtPayload) => {
+        const functions = []
+        if(payload.type === TOKEN_TYPES.access) functions.push( ...this.accessTokenValidationCheckFunctions )
+        if(payload.type === TOKEN_TYPES.refresh) functions.push( ...this.refreshTokenValidationCheckFunctions )
+
+        functions.forEach(func => {
+            if(!func(jwt, payload)){
+                throw new Error(`${payload.type} is invalid`)
+            }
+        })
+
+    }
+
     verifyJwt = (jwt: string) => {
         const payload = verify(jwt, this.secret) as JwtPayload
 
         // check if the token is revoked or fails custom validation check
-        this.accessTokenValidationCheckFunctions.forEach(func => {
-            console.log('running func')
-            if(!func(jwt, payload)){
-                console.log('throwing')
-                throw new Error('accessToken is invalid')
-            }
-        })
+        this.customValidation(jwt, payload)
 
         return payload
     }
@@ -139,15 +142,21 @@ class EasyJWT{
         }
 
         // check if the token is revoked
-        this.refreshTokenValidationCheckFunctions.forEach(func => {
-            if(!func(refreshToken, payload)){
-                throw new Error('refreshToken is invalid')
-            }
-        })
+        this.customValidation(refreshToken, payload)
 
-        const { sub }= payload
+        const { sub } = payload
 
         // delete the required claims. They'll be remade
+        this.clearPayloadForDuplication(payload)
+
+        if(typeof sub !== 'string'){
+            throw new Error('Subject malformed')
+        }
+
+        return this.createAccessToken(sub, payload)
+    }
+
+    private clearPayloadForDuplication(payload: JwtPayload){
         delete payload.type
         delete payload.iss
         delete payload.sub
@@ -156,12 +165,6 @@ class EasyJWT{
         delete payload.nbf
         delete payload.iat
         delete payload.jti
-
-        if(typeof sub !== 'string'){
-            throw new Error('Subject malformed')
-        }
-
-        return this.createAccessToken(sub, payload)
     }
 
     getsModel<T>(func: UserGetter<T>){

@@ -108,7 +108,7 @@ describe('EasyJWT', () => {
         // then - the expected failure occurs
         expect(() => {
             inst.verifyJwt(secondTokens.accessToken)
-        }).toThrow('accessToken is invalid')
+        }).toThrow('access_token is invalid')
     })
 
     test('Can use custom validation for refresh tokens', async () => {
@@ -128,7 +128,7 @@ describe('EasyJWT', () => {
         }
 
         // then - the expected error occurs
-        expect(attemptRefresh).toThrow('refreshToken is invalid')
+        expect(attemptRefresh).toThrow('refresh_token is invalid')
     })
 
     test('throw when trying to use consumer getter before its defined', () => {
@@ -142,6 +142,35 @@ describe('EasyJWT', () => {
 
         // then - the expected error is thrown
         expect(attemptGetModel).toThrow('call getsModel first')
+    })
+
+    test('consumer defined getter function async', async () => {
+        // given - a user model, user instance, store of users, and custom getter
+        class User{
+            id: string
+            name: string
+            constructor(id: string, name: string){
+                this.id = id
+                this.name = name
+            }
+        }
+        const bob = new User('123', 'Bob bobson')
+        const userDatabase: Record<string, User> = { [bob.id]: bob }
+
+        // when - we define an async getter
+        const inst = new EasyJwt({secret}) 
+        inst.getsModel<Promise<User>>(async (jwt, payload) => {
+            if(!payload.sub) throw new Error('Not a user token')
+
+            return userDatabase[payload.sub] ?? undefined
+        })
+
+        // then - we can await the getter
+        const { accessToken } = inst.createTokens( bob.id )
+        const retrievedBob = await inst.getModel<Promise<User>>( accessToken )
+
+        expect(retrievedBob).toBeInstanceOf(User)
+        expect(retrievedBob).toBe(bob)
     })
 
     test('consumer defined getter function', () => {

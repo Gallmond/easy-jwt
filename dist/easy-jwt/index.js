@@ -48,29 +48,20 @@ class EasyJWT {
     getJid = () => {
         return (0, node_crypto_1.randomBytes)(16).toString('hex');
     };
-    createAccessToken = (subject, customPayload = {}) => {
-        const payload = {
-            ...customPayload,
-            type: TOKEN_TYPES.access,
+    getSigningOptions = (subject, expiresIn) => {
+        return {
+            subject,
+            expiresIn,
+            audience: this.audience,
+            issuer: this.issuer,
+            jwtid: this.getJid()
         };
-        const expiresIn = this.accessTokenOptions.expiresIn;
-        const { audience, issuer } = this;
-        const jwtid = this.getJid();
-        return (0, jsonwebtoken_1.sign)(payload, this.secret, {
-            expiresIn, audience, issuer, jwtid, subject
-        });
+    };
+    createAccessToken = (subject, customPayload = {}) => {
+        return (0, jsonwebtoken_1.sign)({ ...customPayload, type: TOKEN_TYPES.access }, this.secret, this.getSigningOptions(subject, this.accessTokenOptions.expiresIn));
     };
     createRefreshToken = (subject, customPayload = {}) => {
-        const payload = {
-            ...customPayload,
-            type: TOKEN_TYPES.refresh,
-        };
-        const expiresIn = this.refreshTokenOptions.expiresIn;
-        const { audience, issuer } = this;
-        const jwtid = this.getJid();
-        return (0, jsonwebtoken_1.sign)(payload, this.secret, {
-            expiresIn, audience, issuer, jwtid, subject
-        });
+        return (0, jsonwebtoken_1.sign)({ ...customPayload, type: TOKEN_TYPES.refresh }, this.secret, this.getSigningOptions(subject, this.refreshTokenOptions.expiresIn));
     };
     decode = (jwt) => {
         return (0, jsonwebtoken_1.decode)(jwt, { complete: true });
@@ -82,16 +73,22 @@ class EasyJWT {
             expiresIn: this.accessTokenOptions.expiresIn
         };
     };
+    customValidation = (jwt, payload) => {
+        const functions = [];
+        if (payload.type === TOKEN_TYPES.access)
+            functions.push(...this.accessTokenValidationCheckFunctions);
+        if (payload.type === TOKEN_TYPES.refresh)
+            functions.push(...this.refreshTokenValidationCheckFunctions);
+        functions.forEach(func => {
+            if (!func(jwt, payload)) {
+                throw new Error(`${payload.type} is invalid`);
+            }
+        });
+    };
     verifyJwt = (jwt) => {
         const payload = (0, jsonwebtoken_1.verify)(jwt, this.secret);
         // check if the token is revoked or fails custom validation check
-        this.accessTokenValidationCheckFunctions.forEach(func => {
-            console.log('running func');
-            if (!func(jwt, payload)) {
-                console.log('throwing');
-                throw new Error('accessToken is invalid');
-            }
-        });
+        this.customValidation(jwt, payload);
         return payload;
     };
     refreshJwt = (refreshToken) => {
@@ -100,13 +97,16 @@ class EasyJWT {
             throw new Error('accessToken used as refreshToken');
         }
         // check if the token is revoked
-        this.refreshTokenValidationCheckFunctions.forEach(func => {
-            if (!func(refreshToken, payload)) {
-                throw new Error('refreshToken is invalid');
-            }
-        });
+        this.customValidation(refreshToken, payload);
         const { sub } = payload;
         // delete the required claims. They'll be remade
+        this.clearPayloadForDuplication(payload);
+        if (typeof sub !== 'string') {
+            throw new Error('Subject malformed');
+        }
+        return this.createAccessToken(sub, payload);
+    };
+    clearPayloadForDuplication(payload) {
         delete payload.type;
         delete payload.iss;
         delete payload.sub;
@@ -115,11 +115,7 @@ class EasyJWT {
         delete payload.nbf;
         delete payload.iat;
         delete payload.jti;
-        if (typeof sub !== 'string') {
-            throw new Error('Subject malformed');
-        }
-        return this.createAccessToken(sub, payload);
-    };
+    }
     getsModel(func) {
         this.returnsSubjectFunction = func;
     }
