@@ -1,12 +1,16 @@
 import { sign, verify, type JwtPayload, type Jwt, decode } from 'jsonwebtoken'
-import {randomBytes} from 'node:crypto'
-import { EasyJWTGetModelError, EasyJWTSubjectError, EasyJWTTypeError, EasyJWTValidationError } from './exceptions'
+import { randomBytes } from 'node:crypto'
+import { SECONDS, TOKEN_TYPES } from './enums'
 import {
+    EasyJWTGetModelError,
+    EasyJWTSubjectError,
+    EasyJWTTypeError,
+    EasyJWTValidationError
+} from './exceptions'
+import type {
     JWTString,
     ValidationCheckFunction,
     UserGetter,
-    SECONDS,
-    TOKEN_TYPES,
     EasyJWTOptions,
 } from './types'
 
@@ -17,8 +21,8 @@ class EasyJWT{
     accessTokenOptions = { expiresIn: SECONDS.hour }
     refreshTokenOptions = { expiresIn: SECONDS.week }
 
-    accessTokenValidationCheckFunctions: ValidationCheckFunction[] = []
-    refreshTokenValidationCheckFunctions: ValidationCheckFunction[] = []
+    accessTokenValidationChecks: ValidationCheckFunction[] = []
+    refreshTokenValidationChecks: ValidationCheckFunction[] = []
 
     returnsSubjectFunction?: UserGetter<unknown>
 
@@ -82,11 +86,11 @@ class EasyJWT{
     }
     
     accessTokenValidation = (func: ValidationCheckFunction) => {
-        this.accessTokenValidationCheckFunctions.push(func)
+        this.accessTokenValidationChecks.push(func)
     }
 
     refreshTokenValidation = (func: ValidationCheckFunction) => {
-        this.refreshTokenValidationCheckFunctions.push(func)
+        this.refreshTokenValidationChecks.push(func)
     }
 
     decode = (jwt: JWTString): Jwt | null => {
@@ -121,7 +125,10 @@ class EasyJWT{
         }
     }
 
-    private createAccessToken = (subject: string, customPayload: JwtPayload = {}): string => {
+    private createAccessToken = (
+        subject: string,
+        customPayload: JwtPayload = {},
+    ): string => {
         return sign(
             { ...customPayload, type: TOKEN_TYPES.access },
             this.secret,
@@ -129,7 +136,10 @@ class EasyJWT{
         )
     }
 
-    private createRefreshToken = (subject: string, customPayload: JwtPayload = {}) => {
+    private createRefreshToken = (
+        subject: string,
+        customPayload: JwtPayload = {},
+    ) => {
         return sign(
             { ...customPayload, type: TOKEN_TYPES.refresh },
             this.secret,
@@ -139,8 +149,12 @@ class EasyJWT{
 
     private customValidation = (jwt: JWTString, payload: JwtPayload) => {
         const functions = []
-        if(payload.type === TOKEN_TYPES.access) functions.push( ...this.accessTokenValidationCheckFunctions )
-        if(payload.type === TOKEN_TYPES.refresh) functions.push( ...this.refreshTokenValidationCheckFunctions )
+        if(payload.type === TOKEN_TYPES.access){
+            functions.push( ...this.accessTokenValidationChecks )
+        } 
+        if(payload.type === TOKEN_TYPES.refresh){
+            functions.push( ...this.refreshTokenValidationChecks )
+        }
 
         functions.forEach(func => {
             if(!func(jwt, payload)){

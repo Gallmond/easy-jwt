@@ -1,5 +1,6 @@
 import { type JwtPayload, type Jwt } from 'jsonwebtoken';
-import { JWTString, ValidationCheckFunction, UserGetter, SECONDS, EasyJWTOptions } from './types';
+import { SECONDS } from './enums';
+import type { JWTString, ValidationCheckFunction, UserGetter, EasyJWTOptions } from './types';
 declare class EasyJWT {
     secret: string;
     audience: string;
@@ -10,8 +11,8 @@ declare class EasyJWT {
     refreshTokenOptions: {
         expiresIn: SECONDS;
     };
-    accessTokenValidationCheckFunctions: ValidationCheckFunction[];
-    refreshTokenValidationCheckFunctions: ValidationCheckFunction[];
+    accessTokenValidationChecks: ValidationCheckFunction[];
+    refreshTokenValidationChecks: ValidationCheckFunction[];
     returnsSubjectFunction?: UserGetter<unknown>;
     constructor(options: EasyJWTOptions);
     createTokens: (subject: string, customPayload?: JwtPayload) => {
