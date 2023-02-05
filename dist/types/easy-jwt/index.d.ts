@@ -1,22 +1,5 @@
 import { type JwtPayload, type Jwt } from 'jsonwebtoken';
-type JWTString = string;
-type ValidationCheckFunction = (jwt: JWTString, payload: JwtPayload) => boolean;
-type UserGetter<T> = (jwt: JWTString, payload: JwtPayload) => T;
-declare enum SECONDS {
-    hour = 3600,
-    day = 86400,
-    week = 604800
-}
-interface ExpiryOption {
-    expiresIn?: number;
-}
-interface EasyJWTOptions {
-    secret: string;
-    audience?: string;
-    issuer?: string;
-    accessToken?: ExpiryOption;
-    refreshToken?: ExpiryOption;
-}
+import { JWTString, ValidationCheckFunction, UserGetter, SECONDS, EasyJWTOptions } from './types';
 declare class EasyJWT {
     secret: string;
     audience: string;

@@ -1,35 +1,15 @@
 import { sign, verify, type JwtPayload, type Jwt, decode } from 'jsonwebtoken'
 import {randomBytes} from 'node:crypto'
 import { EasyJWTGetModelError, EasyJWTSubjectError, EasyJWTTypeError, EasyJWTValidationError } from './exceptions'
+import {
+    JWTString,
+    ValidationCheckFunction,
+    UserGetter,
+    SECONDS,
+    TOKEN_TYPES,
+    EasyJWTOptions,
+} from './types'
 
-type JWTString = string
-
-type ValidationCheckFunction = (jwt: JWTString, payload: JwtPayload) => boolean
-
-type UserGetter<T> = (jwt: JWTString, payload: JwtPayload) => T
-
-enum SECONDS{
-    hour = 60 * 60,
-    day = 60 * 60 * 24,
-    week = 60 * 60 * 24 * 7,
-}
-
-enum TOKEN_TYPES{
-    access = 'access_token',
-    refresh = 'refresh_token',
-}
-
-interface ExpiryOption{
-    expiresIn?: number
-}
-
-interface EasyJWTOptions{
-    secret: string,
-    audience?: string
-    issuer?: string
-    accessToken?: ExpiryOption,
-    refreshToken?: ExpiryOption
-}
 
 class EasyJWT{
     secret: string
