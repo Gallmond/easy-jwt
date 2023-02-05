@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Simple boilerplate implementation for JWT authorisation",
   "main": "dist/index.js",
+  "repository": {"url": "https://github.com/Gallmond/easy-jwt"},
   "scripts": {
     "lint": "npx eslint src/**/*.ts",
     "fix": "npx eslint src/**/*.ts --fix",
