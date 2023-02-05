@@ -1,5 +1,6 @@
 import { sign, verify, type JwtPayload, type Jwt, decode } from 'jsonwebtoken'
 import {randomBytes} from 'node:crypto'
+import { EasyJWTGetModelError, EasyJWTSubjectError, EasyJWTTypeError, EasyJWTValidationError } from './exceptions'
 
 type JWTString = string
 
@@ -119,7 +120,7 @@ class EasyJWT{
 
         functions.forEach(func => {
             if(!func(jwt, payload)){
-                throw new Error(`${payload.type} is invalid`)
+                throw new EasyJWTValidationError(`${payload.type} is invalid`)
             }
         })
 
@@ -138,7 +139,7 @@ class EasyJWT{
         const payload = verify(refreshToken, this.secret) as JwtPayload
 
         if(payload.type !== TOKEN_TYPES.refresh){
-            throw new Error('accessToken used as refreshToken')
+            throw new EasyJWTTypeError('accessToken used as refreshToken')
         }
 
         // check if the token is revoked
@@ -150,7 +151,7 @@ class EasyJWT{
         this.clearPayloadForDuplication(payload)
 
         if(typeof sub !== 'string'){
-            throw new Error('Subject malformed')
+            throw new EasyJWTSubjectError('Subject malformed')
         }
 
         return this.createAccessToken(sub, payload)
@@ -173,7 +174,7 @@ class EasyJWT{
 
     getModel<T>(jwt: JWTString){
         if(!this.returnsSubjectFunction){
-            throw new Error('call getsModel first`')
+            throw new EasyJWTGetModelError('call getsModel first`')
         }
 
         const payload = this.verifyJwt(jwt) as JwtPayload

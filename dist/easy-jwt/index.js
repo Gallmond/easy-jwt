@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = require("jsonwebtoken");
 const node_crypto_1 = require("node:crypto");
+const exceptions_1 = require("./exceptions");
 var SECONDS;
 (function (SECONDS) {
     SECONDS[SECONDS["hour"] = 3600] = "hour";
@@ -81,7 +82,7 @@ class EasyJWT {
             functions.push(...this.refreshTokenValidationCheckFunctions);
         functions.forEach(func => {
             if (!func(jwt, payload)) {
-                throw new Error(`${payload.type} is invalid`);
+                throw new exceptions_1.EasyJWTValidationError(`${payload.type} is invalid`);
             }
         });
     };
@@ -94,7 +95,7 @@ class EasyJWT {
     refreshJwt = (refreshToken) => {
         const payload = (0, jsonwebtoken_1.verify)(refreshToken, this.secret);
         if (payload.type !== TOKEN_TYPES.refresh) {
-            throw new Error('accessToken used as refreshToken');
+            throw new exceptions_1.EasyJWTTypeError('accessToken used as refreshToken');
         }
         // check if the token is revoked
         this.customValidation(refreshToken, payload);
@@ -102,7 +103,7 @@ class EasyJWT {
         // delete the required claims. They'll be remade
         this.clearPayloadForDuplication(payload);
         if (typeof sub !== 'string') {
-            throw new Error('Subject malformed');
+            throw new exceptions_1.EasyJWTSubjectError('Subject malformed');
         }
         return this.createAccessToken(sub, payload);
     };
@@ -121,7 +122,7 @@ class EasyJWT {
     }
     getModel(jwt) {
         if (!this.returnsSubjectFunction) {
-            throw new Error('call getsModel first`');
+            throw new exceptions_1.EasyJWTGetModelError('call getsModel first`');
         }
         const payload = this.verifyJwt(jwt);
         return this.returnsSubjectFunction(jwt, payload);

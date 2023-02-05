@@ -1,4 +1,4 @@
-# easy-jwt-auth
+# easy-jwt
 
 A dead easy implementation of JWT as authentication.
 
@@ -59,3 +59,23 @@ easyAuth.getsModel<ReturnsUser>(async (jwt, payload) => {
 
 const authorisedUser = await easyAuth.getModel<ReturnsUser>( accessToken )
 ```
+
+## Errors
+
+Custom errors that may be thrown include:
+
+### EasyJWTValidationError
+When custom validation checks fail
+
+### EasyJWTTypeError
+When a refresh attempt is made on a token of type other than `refresh_token`
+
+### EasyJWTSubjectError
+When a token is missing a subject
+
+### EasyJWTGetModelError
+When at attempt is made to use `getModel` before the retrieval function has been defined
+
+### All base `jsonwebtoken` errors
+
+see project [readme](https://github.com/auth0/node-jsonwebtoken#errors--codes)
