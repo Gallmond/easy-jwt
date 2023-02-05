@@ -30,51 +30,12 @@ class EasyJWT {
             };
         }
     }
-    accessTokenValidation = (func) => {
-        this.accessTokenValidationCheckFunctions.push(func);
-    };
-    refreshTokenValidation = (func) => {
-        this.refreshTokenValidationCheckFunctions.push(func);
-    };
-    getJid = () => {
-        return (0, node_crypto_1.randomBytes)(16).toString('hex');
-    };
-    getSigningOptions = (subject, expiresIn) => {
-        return {
-            subject,
-            expiresIn,
-            audience: this.audience,
-            issuer: this.issuer,
-            jwtid: this.getJid()
-        };
-    };
-    createAccessToken = (subject, customPayload = {}) => {
-        return (0, jsonwebtoken_1.sign)({ ...customPayload, type: types_1.TOKEN_TYPES.access }, this.secret, this.getSigningOptions(subject, this.accessTokenOptions.expiresIn));
-    };
-    createRefreshToken = (subject, customPayload = {}) => {
-        return (0, jsonwebtoken_1.sign)({ ...customPayload, type: types_1.TOKEN_TYPES.refresh }, this.secret, this.getSigningOptions(subject, this.refreshTokenOptions.expiresIn));
-    };
-    decode = (jwt) => {
-        return (0, jsonwebtoken_1.decode)(jwt, { complete: true });
-    };
     createTokens = (subject, customPayload = {}) => {
         return {
             accessToken: this.createAccessToken(subject, customPayload),
             refreshToken: this.createRefreshToken(subject, customPayload),
             expiresIn: this.accessTokenOptions.expiresIn
         };
-    };
-    customValidation = (jwt, payload) => {
-        const functions = [];
-        if (payload.type === types_1.TOKEN_TYPES.access)
-            functions.push(...this.accessTokenValidationCheckFunctions);
-        if (payload.type === types_1.TOKEN_TYPES.refresh)
-            functions.push(...this.refreshTokenValidationCheckFunctions);
-        functions.forEach(func => {
-            if (!func(jwt, payload)) {
-                throw new exceptions_1.EasyJWTValidationError(`${payload.type} is invalid`);
-            }
-        });
     };
     verifyJwt = (jwt) => {
         const payload = (0, jsonwebtoken_1.verify)(jwt, this.secret);
@@ -97,16 +58,15 @@ class EasyJWT {
         }
         return this.createAccessToken(sub, payload);
     };
-    clearPayloadForDuplication(payload) {
-        delete payload.type;
-        delete payload.iss;
-        delete payload.sub;
-        delete payload.aud;
-        delete payload.exp;
-        delete payload.nbf;
-        delete payload.iat;
-        delete payload.jti;
-    }
+    accessTokenValidation = (func) => {
+        this.accessTokenValidationCheckFunctions.push(func);
+    };
+    refreshTokenValidation = (func) => {
+        this.refreshTokenValidationCheckFunctions.push(func);
+    };
+    decode = (jwt) => {
+        return (0, jsonwebtoken_1.decode)(jwt, { complete: true });
+    };
     getsModel(func) {
         this.returnsSubjectFunction = func;
     }
@@ -116,6 +76,46 @@ class EasyJWT {
         }
         const payload = this.verifyJwt(jwt);
         return this.returnsSubjectFunction(jwt, payload);
+    }
+    getJid = () => {
+        return (0, node_crypto_1.randomBytes)(16).toString('hex');
+    };
+    getSigningOptions = (subject, expiresIn) => {
+        return {
+            subject,
+            expiresIn,
+            audience: this.audience,
+            issuer: this.issuer,
+            jwtid: this.getJid()
+        };
+    };
+    createAccessToken = (subject, customPayload = {}) => {
+        return (0, jsonwebtoken_1.sign)({ ...customPayload, type: types_1.TOKEN_TYPES.access }, this.secret, this.getSigningOptions(subject, this.accessTokenOptions.expiresIn));
+    };
+    createRefreshToken = (subject, customPayload = {}) => {
+        return (0, jsonwebtoken_1.sign)({ ...customPayload, type: types_1.TOKEN_TYPES.refresh }, this.secret, this.getSigningOptions(subject, this.refreshTokenOptions.expiresIn));
+    };
+    customValidation = (jwt, payload) => {
+        const functions = [];
+        if (payload.type === types_1.TOKEN_TYPES.access)
+            functions.push(...this.accessTokenValidationCheckFunctions);
+        if (payload.type === types_1.TOKEN_TYPES.refresh)
+            functions.push(...this.refreshTokenValidationCheckFunctions);
+        functions.forEach(func => {
+            if (!func(jwt, payload)) {
+                throw new exceptions_1.EasyJWTValidationError(`${payload.type} is invalid`);
+            }
+        });
+    };
+    clearPayloadForDuplication(payload) {
+        delete payload.type;
+        delete payload.iss;
+        delete payload.sub;
+        delete payload.aud;
+        delete payload.exp;
+        delete payload.nbf;
+        delete payload.iat;
+        delete payload.jti;
     }
 }
 exports.default = EasyJWT;

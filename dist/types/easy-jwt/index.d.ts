@@ -14,24 +14,24 @@ declare class EasyJWT {
     refreshTokenValidationCheckFunctions: ValidationCheckFunction[];
     returnsSubjectFunction?: UserGetter<unknown>;
     constructor(options: EasyJWTOptions);
-    accessTokenValidation: (func: ValidationCheckFunction) => void;
-    refreshTokenValidation: (func: ValidationCheckFunction) => void;
-    private getJid;
-    private getSigningOptions;
-    private createAccessToken;
-    private createRefreshToken;
-    decode: (jwt: JWTString) => Jwt | null;
     createTokens: (subject: string, customPayload?: JwtPayload) => {
         accessToken: string;
         refreshToken: string;
         expiresIn: SECONDS;
     };
-    private customValidation;
     verifyJwt: (jwt: string) => JwtPayload;
     refreshJwt: (refreshToken: string) => string;
-    private clearPayloadForDuplication;
+    accessTokenValidation: (func: ValidationCheckFunction) => void;
+    refreshTokenValidation: (func: ValidationCheckFunction) => void;
+    decode: (jwt: JWTString) => Jwt | null;
     getsModel<T>(func: UserGetter<T>): void;
     getModel<T>(jwt: JWTString): T;
+    private getJid;
+    private getSigningOptions;
+    private createAccessToken;
+    private createRefreshToken;
+    private customValidation;
+    private clearPayloadForDuplication;
 }
 export default EasyJWT;
 //# sourceMappingURL=index.d.ts.map
