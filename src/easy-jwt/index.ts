@@ -1,18 +1,6 @@
 import { sign, verify, type JwtPayload, type Jwt, decode } from 'jsonwebtoken'
 import {randomBytes} from 'node:crypto'
 
-interface ExpiryOption{
-    expiresIn?: number
-}
-
-interface EasyJWTOptions{
-    secret: string,
-    audience?: string
-    issuer?: string
-    accessToken?: ExpiryOption,
-    refreshToken?: ExpiryOption
-}
-
 type JWTString = string
 
 type ValidationCheckFunction = (jwt: JWTString, payload: JwtPayload) => boolean
@@ -30,21 +18,27 @@ enum TOKEN_TYPES{
     refresh = 'refresh_token',
 }
 
-class EasyJWT{
+interface ExpiryOption{
+    expiresIn?: number
+}
 
+interface EasyJWTOptions{
+    secret: string,
+    audience?: string
+    issuer?: string
+    accessToken?: ExpiryOption,
+    refreshToken?: ExpiryOption
+}
+
+class EasyJWT{
     secret: string
     audience = 'easy-jwt'
     issuer = 'easy-jwt'
-    accessTokenOptions = {
-        expiresIn: SECONDS.hour
-    }
-    refreshTokenOptions = {
-        expiresIn: SECONDS.week
-    }
+    accessTokenOptions = { expiresIn: SECONDS.hour }
+    refreshTokenOptions = { expiresIn: SECONDS.week }
 
     accessTokenValidationCheckFunctions: ValidationCheckFunction[] = []
-    accessTokenRevokedCheckFunctions: ValidationCheckFunction[] = []
-    refreshTokenRevokedCheckFunctions: ValidationCheckFunction[] = []
+    refreshTokenValidationCheckFunctions: ValidationCheckFunction[] = []
 
     returnsSubjectFunction?: UserGetter<unknown>
 
@@ -72,12 +66,8 @@ class EasyJWT{
         this.accessTokenValidationCheckFunctions.push(func)
     }
 
-    accessTokenRevokedWhen = (func: ValidationCheckFunction) => {
-        this.accessTokenRevokedCheckFunctions.push(func)
-    }
-
-    refreshTokenRevokedWhen = (func: ValidationCheckFunction) => {
-        this.refreshTokenRevokedCheckFunctions.push(func)
+    refreshTokenValidation = (func: ValidationCheckFunction) => {
+        this.refreshTokenValidationCheckFunctions.push(func)
     }
 
     private getJid = () => {
@@ -129,14 +119,11 @@ class EasyJWT{
     verifyJwt = (jwt: string) => {
         const payload = verify(jwt, this.secret) as JwtPayload
 
-        const checkFunctions = [
-            ...this.accessTokenRevokedCheckFunctions,
-            ...this.accessTokenValidationCheckFunctions
-        ]
-
         // check if the token is revoked or fails custom validation check
-        checkFunctions.forEach(func => {
+        this.accessTokenValidationCheckFunctions.forEach(func => {
+            console.log('running func')
             if(!func(jwt, payload)){
+                console.log('throwing')
                 throw new Error('accessToken is invalid')
             }
         })
@@ -152,7 +139,7 @@ class EasyJWT{
         }
 
         // check if the token is revoked
-        this.refreshTokenRevokedCheckFunctions.forEach(func => {
+        this.refreshTokenValidationCheckFunctions.forEach(func => {
             if(!func(refreshToken, payload)){
                 throw new Error('refreshToken is invalid')
             }

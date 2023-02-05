@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = require("jsonwebtoken");
+const node_crypto_1 = require("node:crypto");
 var SECONDS;
 (function (SECONDS) {
     SECONDS[SECONDS["hour"] = 3600] = "hour";
@@ -15,19 +16,16 @@ var TOKEN_TYPES;
 class EasyJWT {
     secret;
     audience = 'easy-jwt';
-    accessTokenOptions = {
-        expiresIn: SECONDS.hour
-    };
-    refreshTokenOptions = {
-        expiresIn: SECONDS.week
-    };
+    issuer = 'easy-jwt';
+    accessTokenOptions = { expiresIn: SECONDS.hour };
+    refreshTokenOptions = { expiresIn: SECONDS.week };
     accessTokenValidationCheckFunctions = [];
-    accessTokenRevokedCheckFunctions = [];
-    refreshTokenRevokedCheckFunctions = [];
+    refreshTokenValidationCheckFunctions = [];
     returnsSubjectFunction;
     constructor(options) {
         this.secret = options.secret;
         this.audience = (options.audience ?? this.audience);
+        this.issuer = (options.issuer ?? this.issuer);
         if (options.accessToken) {
             this.accessTokenOptions = {
                 ...this.accessTokenOptions,
@@ -44,44 +42,53 @@ class EasyJWT {
     accessTokenValidation = (func) => {
         this.accessTokenValidationCheckFunctions.push(func);
     };
-    accessTokenRevokedWhen = (func) => {
-        this.accessTokenRevokedCheckFunctions.push(func);
+    refreshTokenValidation = (func) => {
+        this.refreshTokenValidationCheckFunctions.push(func);
     };
-    refreshTokenRevokedWhen = (func) => {
-        this.refreshTokenRevokedCheckFunctions.push(func);
+    getJid = () => {
+        return (0, node_crypto_1.randomBytes)(16).toString('hex');
     };
-    createAccessToken = (customPayload) => {
+    createAccessToken = (subject, customPayload = {}) => {
         const payload = {
+            ...customPayload,
             type: TOKEN_TYPES.access,
-            exp: this.accessTokenOptions.expiresIn,
-            ...customPayload
         };
-        return (0, jsonwebtoken_1.sign)(payload, this.secret);
+        const expiresIn = this.accessTokenOptions.expiresIn;
+        const { audience, issuer } = this;
+        const jwtid = this.getJid();
+        return (0, jsonwebtoken_1.sign)(payload, this.secret, {
+            expiresIn, audience, issuer, jwtid, subject
+        });
     };
-    createRefreshToken = (customPayload) => {
+    createRefreshToken = (subject, customPayload = {}) => {
         const payload = {
+            ...customPayload,
             type: TOKEN_TYPES.refresh,
-            exp: this.refreshTokenOptions.expiresIn,
-            ...customPayload
         };
-        return (0, jsonwebtoken_1.sign)(payload, this.secret);
+        const expiresIn = this.refreshTokenOptions.expiresIn;
+        const { audience, issuer } = this;
+        const jwtid = this.getJid();
+        return (0, jsonwebtoken_1.sign)(payload, this.secret, {
+            expiresIn, audience, issuer, jwtid, subject
+        });
     };
-    createTokens = (customPayload) => {
+    decode = (jwt) => {
+        return (0, jsonwebtoken_1.decode)(jwt, { complete: true });
+    };
+    createTokens = (subject, customPayload = {}) => {
         return {
-            accessToken: this.createAccessToken(customPayload),
-            refreshToken: this.createRefreshToken(customPayload),
+            accessToken: this.createAccessToken(subject, customPayload),
+            refreshToken: this.createRefreshToken(subject, customPayload),
             expiresIn: this.accessTokenOptions.expiresIn
         };
     };
     verifyJwt = (jwt) => {
         const payload = (0, jsonwebtoken_1.verify)(jwt, this.secret);
-        const checkFunctions = [
-            ...this.accessTokenRevokedCheckFunctions,
-            ...this.accessTokenValidationCheckFunctions
-        ];
         // check if the token is revoked or fails custom validation check
-        checkFunctions.forEach(func => {
+        this.accessTokenValidationCheckFunctions.forEach(func => {
+            console.log('running func');
             if (!func(jwt, payload)) {
+                console.log('throwing');
                 throw new Error('accessToken is invalid');
             }
         });
@@ -93,19 +100,25 @@ class EasyJWT {
             throw new Error('accessToken used as refreshToken');
         }
         // check if the token is revoked
-        this.refreshTokenRevokedCheckFunctions.forEach(func => {
+        this.refreshTokenValidationCheckFunctions.forEach(func => {
             if (!func(refreshToken, payload)) {
                 throw new Error('refreshToken is invalid');
             }
         });
-        // delete payload.iss
-        // delete payload.sub
-        // delete payload.aud
+        const { sub } = payload;
+        // delete the required claims. They'll be remade
+        delete payload.type;
+        delete payload.iss;
+        delete payload.sub;
+        delete payload.aud;
         delete payload.exp;
         delete payload.nbf;
         delete payload.iat;
         delete payload.jti;
-        return this.createAccessToken(payload);
+        if (typeof sub !== 'string') {
+            throw new Error('Subject malformed');
+        }
+        return this.createAccessToken(sub, payload);
     };
     getsModel(func) {
         this.returnsSubjectFunction = func;

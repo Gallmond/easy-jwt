@@ -11,54 +11,67 @@ describe('EasyJWT', () => {
     const audience = 'test-audience'
 
     test('Can instantiate', async () => {
-        const inst = new EasyJwt({secret, audience})
+        // given - configs exist 
+        const options = {secret, audience}
+
+        // when - we create new instance
+        const inst = new EasyJwt(options)
+        
+        // then - it is created with no issues
         expect(inst).toBeInstanceOf(EasyJwt)
     })
 
     test('Can create tokens', async () => {
+        // given - an instance with relevant configs
         const twoDaysInSeconds = 60 * 60 * 24 * 2
-
-        const subject = 'user-id-123'
-
         const inst = new EasyJwt({secret, audience, accessToken: {expiresIn: twoDaysInSeconds}})
+        
+        // when - we create tokens
+        const subject = 'user-id-123'
         const {accessToken, expiresIn, refreshToken} = inst.createTokens(subject, {
             foo: 'bar'
         })
+        
+        // then - tokens are returned
         looksLikeJWT(accessToken)
         looksLikeJWT(refreshToken)
         expect(expiresIn).toBe(twoDaysInSeconds)
     })
 
     test('Can validate created tokens', async () => {
-
+        // given - generated tokens
         const subject = 'user-id-123'
-
         const inst = new EasyJwt({secret, audience})
-        const {accessToken, expiresIn, refreshToken} = inst.createTokens(subject, {
+        const {accessToken} = inst.createTokens(subject, {
             foo: 'bar'
         })
-
+        
+        // when - we try to verify the access token
         const validated = inst.verifyJwt(accessToken)
+
+        // then - the decided payload is returned with no error
         expect(validated.foo).toBe('bar')
     })
 
     test('Can refresh token', async () => {
-
+        // given - an existing set of tokens
         const subject = 'user-id-123'
-
         const inst = new EasyJwt({secret, audience})
-        const {accessToken, expiresIn, refreshToken} = inst.createTokens(subject, {
+        const {accessToken, refreshToken} = inst.createTokens(subject, {
             foo: 'bar'
         })
-
-        const firstTokenData = inst.decode(accessToken) as Jwt
-        const firstPayload = firstTokenData.payload as JwtPayload
-
+        
         // advance time by 30:01 so we can check the times have changed
         const thirtyMinutesAndOneSecondLater = new Date( new Date().valueOf() + (60 * 30 * 1000) + 1000 )
         jest.useFakeTimers().setSystemTime(thirtyMinutesAndOneSecondLater)
 
+        // when - we try to get a new access token by using the refresh token
         const newAccessToken = inst.refreshJwt( refreshToken )
+        
+        // then - a new access token with new exp payload but same data payload is returned
+        const firstTokenData = inst.decode(accessToken) as Jwt
+        const firstPayload = firstTokenData.payload as JwtPayload
+        
         const secondTokenData = inst.decode(newAccessToken) as Jwt
         const secondPayload = secondTokenData.payload as JwtPayload
 
@@ -78,9 +91,8 @@ describe('EasyJWT', () => {
     })
 
     test('Can use custom validation', async () => {
-
+        // given - an instance with custom validation logic and two tokens
         const subject = 'user-id-123'
-
         const inst = new EasyJwt({secret, audience})
         inst.accessTokenValidation((jwt, payload) => {
             return payload.foo === 'bar'
@@ -89,38 +101,82 @@ describe('EasyJWT', () => {
         const firstTokens = inst.createTokens(subject, {foo: 'bar'})
         const secondTokens = inst.createTokens(subject, {foo: 'fizz'})
 
+        // when - we try to validate the tokens
         const firstValid = inst.verifyJwt(firstTokens.accessToken)
         expect(typeof firstValid).toBe('object')
-
+        
+        // then - the expected failure occurs
         expect(() => {
             inst.verifyJwt(secondTokens.accessToken)
-        }).rejects.toThrow('accessToken is invalid')
+        }).toThrow('accessToken is invalid')
     })
 
-    test('Can use custom accessToken revoke check', async () => {
-
+    test('Can use custom validation for refresh tokens', async () => {
+        // given - custom refresh token validation logic
         const subject = 'user-id-123'
-
-        const revokedTokensDatabase: Record<string, boolean> = {}
-
+        const invalidRefreshTokens: string[] = []
         const inst = new EasyJwt({secret, audience})
-        inst.accessTokenRevokedWhen((jwt, payload) => {
-            if(revokedTokensDatabase[ jwt ]){
-                return true
-            }
+        inst.refreshTokenValidation((jwt) => {
+            return !invalidRefreshTokens.includes(jwt)
+        })
+        const {refreshToken} = inst.createTokens(subject, {foo: 'bar'})
+        invalidRefreshTokens.push(refreshToken)
 
-            return false
+        // when - we try to validate a token that we know is in valid
+        const attemptRefresh = () => {
+            inst.refreshJwt(refreshToken)
+        }
+
+        // then - the expected error occurs
+        expect(attemptRefresh).toThrow('refreshToken is invalid')
+    })
+
+    test('throw when trying to use consumer getter before its defined', () => {
+        // given - an instance that has not yet had the custom model getter defined
+        const subject = 'user-123'
+        const inst = new EasyJwt({secret, audience})
+        const { accessToken } = inst.createTokens(subject)
+        
+        // when - we try to use the model getter
+        const attemptGetModel = () => inst.getModel<unknown>( accessToken )
+
+        // then - the expected error is thrown
+        expect(attemptGetModel).toThrow('call getsModel first')
+    })
+
+    test('consumer defined getter function', () => {
+        // given - a user model, user instance, store of users, and custom getter
+        class User{
+            id: string
+            name: string
+            constructor(id: string, name: string){
+                this.id = id
+                this.name = name
+            }
+        }
+        const bob = new User('123', 'Bob bobson')
+        const userDatabase: Record<string, User> = { [bob.id]: bob }
+
+        const inst = new EasyJwt({secret})
+
+        inst.getsModel<User | undefined>((jwt, payload) => {
+            if(!payload.sub) throw new Error('Not a user token')
+
+            return userDatabase[ payload.sub ] ?? undefined
         })
 
-        const {accessToken} = inst.createTokens(subject, {foo: 'bar'})
-        revokedTokensDatabase[ accessToken ] = true
+        // when - we try to use the getter
+        const { accessToken } = inst.createTokens( bob.id )
+        const retrievedModel = inst.getModel<User>( accessToken )
 
-        expect(() => {
-            inst.verifyJwt( accessToken )
-        }).rejects.toThrow('accessToken is invalid')
+        const noUserToken = inst.createTokens( 'foobar' ).accessToken
 
+        // then - the expected model is returned (or not) as expected
+        expect(retrievedModel).toBeInstanceOf(User)
+        expect(retrievedModel).toBe(bob)
+
+        const missingModel = inst.getModel<User>(noUserToken)
+        expect(missingModel).toBeUndefined()
     })
-
-    test('Can use custom refreshToken revoke check', async () => {})
 
 })
