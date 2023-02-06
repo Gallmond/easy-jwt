@@ -6,6 +6,7 @@
   "repository": {
     "url": "https://github.com/Gallmond/easy-jwt"
   },
+  "types": "dist/types",
   "scripts": {
     "lint": "npx eslint src/**/*.ts",
     "fix": "npx eslint src/**/*.ts --fix",
