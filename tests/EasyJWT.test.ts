@@ -1,4 +1,4 @@
-import { Jwt, JwtPayload } from 'jsonwebtoken'
+import { decode, Jwt, JwtPayload } from 'jsonwebtoken'
 import EasyJwt from '../src/index'
 
 const looksLikeJWT = (jwt: string) => {
@@ -47,7 +47,7 @@ describe('EasyJWT', () => {
         })
         
         // when - we try to verify the access token
-        const validated = inst.verifyJwt(accessToken)
+        const validated = await inst.verifyJwt(accessToken)
 
         // then - the decided payload is returned with no error
         expect(validated.foo).toBe('bar')
@@ -66,7 +66,7 @@ describe('EasyJWT', () => {
         jest.useFakeTimers().setSystemTime(thirtyMinutesAndOneSecondLater)
 
         // when - we try to get a new access token by using the refresh token
-        const newAccessToken = inst.refreshJwt( refreshToken )
+        const newAccessToken = await inst.refreshJwt( refreshToken )
         
         // then - a new access token with new exp payload but same data payload is returned
         const firstTokenData = inst.decode(accessToken) as Jwt
@@ -90,6 +90,25 @@ describe('EasyJWT', () => {
         jest.useRealTimers()
     })
 
+    test('Can use custom validation async', async () => {
+        // given - an instance with custom validation logic and two tokens
+        const subject = 'user-id-123'
+        const inst = new EasyJwt({secret, audience})
+        inst.accessTokenValidation(async (jwt, payload) => {
+            return payload.foo === 'bar'
+        })
+
+        const firstTokens = inst.createTokens(subject, {foo: 'bar'})
+        const secondTokens = inst.createTokens(subject, {foo: 'fizz'})
+
+        // when - we try to validate the tokens
+        const firstValid = await inst.verifyJwt(firstTokens.accessToken)
+        expect(typeof firstValid).toBe('object')
+        
+        // then - the expected failure occurs
+        expect(inst.verifyJwt(secondTokens.accessToken)).rejects.toThrow('access_token is invalid')
+    })
+
     test('Can use custom validation', async () => {
         // given - an instance with custom validation logic and two tokens
         const subject = 'user-id-123'
@@ -102,13 +121,14 @@ describe('EasyJWT', () => {
         const secondTokens = inst.createTokens(subject, {foo: 'fizz'})
 
         // when - we try to validate the tokens
-        const firstValid = inst.verifyJwt(firstTokens.accessToken)
+        const firstValid = await inst.verifyJwt(firstTokens.accessToken)
+
         expect(typeof firstValid).toBe('object')
         
         // then - the expected failure occurs
-        expect(() => {
-            inst.verifyJwt(secondTokens.accessToken)
-        }).toThrow('access_token is invalid')
+        expect(inst.verifyJwt(secondTokens.accessToken))
+            .rejects
+            .toThrow('access_token is invalid')
     })
 
     test('Can use custom validation for refresh tokens', async () => {
@@ -123,12 +143,9 @@ describe('EasyJWT', () => {
         invalidRefreshTokens.push(refreshToken)
 
         // when - we try to validate a token that we know is in valid
-        const attemptRefresh = () => {
-            inst.refreshJwt(refreshToken)
-        }
 
         // then - the expected error occurs
-        expect(attemptRefresh).toThrow('refresh_token is invalid')
+        expect(inst.refreshJwt(refreshToken)).rejects.toThrow('refresh_token is invalid')
     })
 
     test('throw when trying to use consumer getter before its defined', () => {
@@ -141,7 +158,7 @@ describe('EasyJWT', () => {
         const attemptGetModel = () => inst.getModel<unknown>( accessToken )
 
         // then - the expected error is thrown
-        expect(attemptGetModel).toThrow('call getsModel first')
+        expect(attemptGetModel).rejects.toThrow('call getsModel first')
     })
 
     test('consumer defined getter function async', async () => {
@@ -173,7 +190,7 @@ describe('EasyJWT', () => {
         expect(retrievedBob).toBe(bob)
     })
 
-    test('consumer defined getter function', () => {
+    test('consumer defined getter function', async () => {
         // given - a user model, user instance, store of users, and custom getter
         class User{
             id: string
@@ -196,7 +213,7 @@ describe('EasyJWT', () => {
 
         // when - we try to use the getter
         const { accessToken } = inst.createTokens( bob.id )
-        const retrievedModel = inst.getModel<User>( accessToken )
+        const retrievedModel = await inst.getModel<User>( accessToken )
 
         const noUserToken = inst.createTokens( 'foobar' ).accessToken
 
@@ -204,7 +221,7 @@ describe('EasyJWT', () => {
         expect(retrievedModel).toBeInstanceOf(User)
         expect(retrievedModel).toBe(bob)
 
-        const missingModel = inst.getModel<User>(noUserToken)
+        const missingModel = await inst.getModel<User>(noUserToken)
         expect(missingModel).toBeUndefined()
     })
 

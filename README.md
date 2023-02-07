@@ -19,7 +19,7 @@ const {accessToken, expiresIn, refreshToken} = easyAuth.createTokens(
 )
 
 // this token can then later be verified like
-const tokenPayload = easyAuth.verifyJwt( accessToken )
+const tokenPayload = await easyAuth.verifyJwt( accessToken )
 tokenPayload.employeeLevel // ['administrator']
 
 // or refreshed like so

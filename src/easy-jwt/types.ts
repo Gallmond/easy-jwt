@@ -2,7 +2,7 @@ import { JwtPayload } from 'jsonwebtoken'
 
 export type JWTString = string
 
-export type ValidationCheckFunction = (jwt: JWTString, payload: JwtPayload) => boolean
+export type ValidationCheckFunction = (jwt: JWTString, payload: JwtPayload) => boolean | Promise<boolean>
 
 export type UserGetter<T> = (jwt: JWTString, payload: JwtPayload) => T
 

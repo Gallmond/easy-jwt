@@ -20,13 +20,13 @@ declare class EasyJWT {
         refreshToken: string;
         expiresIn: SECONDS;
     };
-    verifyJwt: (jwt: string) => JwtPayload;
-    refreshJwt: (refreshToken: string) => string;
+    verifyJwt: (jwt: string) => Promise<JwtPayload>;
+    refreshJwt: (refreshToken: string) => Promise<string>;
     accessTokenValidation: (func: ValidationCheckFunction) => void;
     refreshTokenValidation: (func: ValidationCheckFunction) => void;
     decode: (jwt: JWTString) => Jwt | null;
     getsModel<T>(func: UserGetter<T>): void;
-    getModel<T>(jwt: JWTString): T;
+    getModel<T>(jwt: JWTString): Promise<T>;
     private getJid;
     private getSigningOptions;
     private createAccessToken;

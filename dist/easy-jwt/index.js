@@ -37,19 +37,19 @@ class EasyJWT {
             expiresIn: this.accessTokenOptions.expiresIn
         };
     };
-    verifyJwt = (jwt) => {
+    verifyJwt = async (jwt) => {
         const payload = (0, jsonwebtoken_1.verify)(jwt, this.secret);
         // check if the token is revoked or fails custom validation check
-        this.customValidation(jwt, payload);
+        await this.customValidation(jwt, payload);
         return payload;
     };
-    refreshJwt = (refreshToken) => {
+    refreshJwt = async (refreshToken) => {
         const payload = (0, jsonwebtoken_1.verify)(refreshToken, this.secret);
         if (payload.type !== enums_1.TOKEN_TYPES.refresh) {
             throw new exceptions_1.EasyJWTTypeError('accessToken used as refreshToken');
         }
         // check if the token is revoked
-        this.customValidation(refreshToken, payload);
+        await this.customValidation(refreshToken, payload);
         const { sub } = payload;
         // delete the required claims. They'll be remade
         this.clearPayloadForDuplication(payload);
@@ -70,11 +70,11 @@ class EasyJWT {
     getsModel(func) {
         this.returnsSubjectFunction = func;
     }
-    getModel(jwt) {
+    async getModel(jwt) {
         if (!this.returnsSubjectFunction) {
             throw new exceptions_1.EasyJWTGetModelError('call getsModel first`');
         }
-        const payload = this.verifyJwt(jwt);
+        const payload = await this.verifyJwt(jwt);
         return this.returnsSubjectFunction(jwt, payload);
     }
     getJid = () => {
@@ -95,7 +95,7 @@ class EasyJWT {
     createRefreshToken = (subject, customPayload = {}) => {
         return (0, jsonwebtoken_1.sign)({ ...customPayload, type: enums_1.TOKEN_TYPES.refresh }, this.secret, this.getSigningOptions(subject, this.refreshTokenOptions.expiresIn));
     };
-    customValidation = (jwt, payload) => {
+    customValidation = async (jwt, payload) => {
         const functions = [];
         if (payload.type === enums_1.TOKEN_TYPES.access) {
             functions.push(...this.accessTokenValidationChecks);
@@ -103,10 +103,15 @@ class EasyJWT {
         if (payload.type === enums_1.TOKEN_TYPES.refresh) {
             functions.push(...this.refreshTokenValidationChecks);
         }
-        functions.forEach(func => {
-            if (!func(jwt, payload)) {
-                throw new exceptions_1.EasyJWTValidationError(`${payload.type} is invalid`);
-            }
+        const results = await Promise.all(functions.map(func => {
+            return func(jwt, payload);
+        }));
+        console.log('DEBUGGG', {
+            jwt, payload, all: (0, jsonwebtoken_1.decode)(jwt, { complete: true })
+        });
+        results.forEach(result => {
+            if (!result)
+                throw new exceptions_1.EasyJWTValidationError(`${payload.type ?? 'token'} is invalid`);
         });
     };
     clearPayloadForDuplication(payload) {

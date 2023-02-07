@@ -54,16 +54,16 @@ class EasyJWT{
         }
     }
 
-    verifyJwt = (jwt: string) => {
+    verifyJwt = async (jwt: string) => {
         const payload = verify(jwt, this.secret) as JwtPayload
 
         // check if the token is revoked or fails custom validation check
-        this.customValidation(jwt, payload)
+        await this.customValidation(jwt, payload)
 
         return payload
     }
 
-    refreshJwt = (refreshToken: string) => {
+    refreshJwt = async (refreshToken: string) => {
         const payload = verify(refreshToken, this.secret) as JwtPayload
 
         if(payload.type !== TOKEN_TYPES.refresh){
@@ -71,7 +71,7 @@ class EasyJWT{
         }
 
         // check if the token is revoked
-        this.customValidation(refreshToken, payload)
+        await this.customValidation(refreshToken, payload)
 
         const { sub } = payload
 
@@ -101,12 +101,12 @@ class EasyJWT{
         this.returnsSubjectFunction = func
     }
 
-    getModel<T>(jwt: JWTString){
+    async getModel<T>(jwt: JWTString){
         if(!this.returnsSubjectFunction){
             throw new EasyJWTGetModelError('call getsModel first`')
         }
 
-        const payload = this.verifyJwt(jwt) as JwtPayload
+        const payload = await this.verifyJwt(jwt) as JwtPayload
 
         return this.returnsSubjectFunction(jwt, payload) as T
     }
@@ -147,7 +147,7 @@ class EasyJWT{
         )
     }
 
-    private customValidation = (jwt: JWTString, payload: JwtPayload) => {
+    private customValidation = async (jwt: JWTString, payload: JwtPayload) => {
         const functions = []
         if(payload.type === TOKEN_TYPES.access){
             functions.push( ...this.accessTokenValidationChecks )
@@ -156,12 +156,17 @@ class EasyJWT{
             functions.push( ...this.refreshTokenValidationChecks )
         }
 
-        functions.forEach(func => {
-            if(!func(jwt, payload)){
-                throw new EasyJWTValidationError(`${payload.type} is invalid`)
-            }
+        const results = await Promise.all(functions.map(func => {
+            return func(jwt, payload)
+        }))
+
+        console.log('DEBUGGG', {
+            jwt, payload, all: decode(jwt, {complete: true})
         })
 
+        results.forEach(result => {
+            if(!result) throw new EasyJWTValidationError(`${payload.type ?? 'token'} is invalid`)
+        })
     }
 
     private clearPayloadForDuplication(payload: JwtPayload){
