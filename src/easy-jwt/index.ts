@@ -160,10 +160,6 @@ class EasyJWT{
             return func(jwt, payload)
         }))
 
-        console.log('DEBUGGG', {
-            jwt, payload, all: decode(jwt, {complete: true})
-        })
-
         results.forEach(result => {
             if(!result) throw new EasyJWTValidationError(`${payload.type ?? 'token'} is invalid`)
         })

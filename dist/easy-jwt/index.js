@@ -106,9 +106,6 @@ class EasyJWT {
         const results = await Promise.all(functions.map(func => {
             return func(jwt, payload);
         }));
-        console.log('DEBUGGG', {
-            jwt, payload, all: (0, jsonwebtoken_1.decode)(jwt, { complete: true })
-        });
         results.forEach(result => {
             if (!result)
                 throw new exceptions_1.EasyJWTValidationError(`${payload.type ?? 'token'} is invalid`);
